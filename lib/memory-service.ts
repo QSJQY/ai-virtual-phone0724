@@ -1,11 +1,11 @@
 // lib/memory-service.ts
 // High-level memory orchestration: retrieve long-term memories for prompt injection.
 
-import type { MemoryConfig, MemoryEntry } from "./memory-types";
-import { loadMemoryEntriesByType } from "./memory-storage";
-import { resolveAuxiliaryApiConfig } from "./settings-storage";
-import { generateEmbedding, resolveEmbeddingModel, cosineSimilarity } from "./memory-embedding";
-import { estimateTokens } from "./token-counter";
+import type { MemoryConfig, MemoryEntry } from \"./memory-types\";
+import { loadMemoryEntriesByType } from \"./memory-storage\";
+import { resolveAuxiliaryApiConfig } from \"./settings-storage\";
+import { generateEmbedding, resolveEmbeddingModel, cosineSimilarity } from \"./memory-embedding\";
+import { estimateTokens } from \"./token-counter\";
 
 /**
  * Retrieve relevant long-term memories for prompt injection.
@@ -18,9 +18,18 @@ import { estimateTokens } from "./token-counter";
 export async function retrieveMemoriesForPrompt(
     characterId: string,
     currentContext: string,
-    config: MemoryConfig
+    config: MemoryConfig,
+    options?: { excludeSourceApps?: string[] }
 ): Promise<MemoryEntry[]> {
-    const longTermEntries = await loadMemoryEntriesByType(characterId, "long_term");
+    let longTermEntries = await loadMemoryEntriesByType(characterId, \"long_term\");
+    
+    // Apply source app filtering if provided
+    if (options?.excludeSourceApps && options.excludeSourceApps.length > 0) {
+        longTermEntries = longTermEntries.filter(
+            entry => !options.excludeSourceApps!.includes(entry.sourceApp)
+        );
+    }
+
     if (longTermEntries.length === 0 || !currentContext.trim()) return [];
 
     const budget = config.longTermTokenBudget;
@@ -37,7 +46,7 @@ export async function retrieveMemoriesForPrompt(
     }
 
     // Strategy 2: vector recall enabled + embedding API configured → vector search, fill by relevance
-    const embeddingApiConfig = config.vectorRecallEnabled ? resolveAuxiliaryApiConfig("embeddingApiConfigId") : null;
+    const embeddingApiConfig = config.vectorRecallEnabled ? resolveAuxiliaryApiConfig(\"embeddingApiConfigId\") : null;
     if (embeddingApiConfig && resolveEmbeddingModel(embeddingApiConfig)) {
         const queryEmbedding = await generateEmbedding(currentContext, embeddingApiConfig);
         if (queryEmbedding) {
@@ -64,7 +73,7 @@ export async function retrieveCoreMemoriesForPrompt(
     characterId: string,
     config: MemoryConfig,
 ): Promise<MemoryEntry[]> {
-    const coreEntries = await loadMemoryEntriesByType(characterId, "core");
+    const coreEntries = await loadMemoryEntriesByType(characterId, \"core\");
     if (coreEntries.length === 0) return [];
 
     const sorted = [...coreEntries].sort((a, b) => {
